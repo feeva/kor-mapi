@@ -3,3 +3,6 @@ dist/
 demo/.env
 .env
 *.local
+
+.claude
+.codex
