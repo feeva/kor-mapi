@@ -14,7 +14,7 @@ export function loadNaverSdk(clientId: string, submodules: string[] = []): Promi
       return;
     }
 
-    const params = new URLSearchParams({ ncpClientId: clientId });
+    const params = new URLSearchParams({ ncpKeyId: clientId });
     if (submodules.length > 0) params.set('submodules', submodules.join(','));
 
     const script = document.createElement('script');

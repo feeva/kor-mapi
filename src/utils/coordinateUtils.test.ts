@@ -6,137 +6,139 @@ import {
   clampFacadeZoom,
 } from './coordinateUtils.js';
 
-// Facade zoom is 0–22 (Google-style, 0 = world, 22 = building)
-// Naver zoom is 1–21 (zoomed out = 1, zoomed in = 21, same direction)
-// Kakao zoom is 1–14 (inverted: 1 = street/zoomed-in, 14 = country/zoomed-out)
+// Facade zoom is 7–19 (Google/Naver-equivalent range)
+// Naver zoom is 7–19 (identity with facade)
+// Kakao zoom is 1–13 (inverted: kakaoLevel = 20 - facadeZoom)
+//   facade 7 = kakao 13, facade 19 = kakao 1
 
 describe('Google zoom (identity)', () => {
-  it('toGoogleZoom is identity', () => {
-    expect(toGoogleZoom(0)).toBe(0);
-    expect(toGoogleZoom(10)).toBe(10);
-    expect(toGoogleZoom(22)).toBe(22);
+  it('toGoogleZoom passes through values in range', () => {
+    expect(toGoogleZoom(7)).toBe(7);
+    expect(toGoogleZoom(12)).toBe(12);
+    expect(toGoogleZoom(19)).toBe(19);
   });
 
-  it('fromGoogleZoom is identity', () => {
-    expect(fromGoogleZoom(0)).toBe(0);
-    expect(fromGoogleZoom(10)).toBe(10);
-    expect(fromGoogleZoom(22)).toBe(22);
+  it('clamps below 7', () => {
+    expect(toGoogleZoom(0)).toBe(7);
+    expect(toGoogleZoom(6)).toBe(7);
+  });
+
+  it('clamps above 19', () => {
+    expect(toGoogleZoom(20)).toBe(19);
+    expect(toGoogleZoom(22)).toBe(19);
   });
 
   it('round-trips', () => {
-    for (let z = 0; z <= 22; z++) {
+    for (let z = 7; z <= 19; z++) {
       expect(fromGoogleZoom(toGoogleZoom(z))).toBe(z);
     }
   });
 });
 
-describe('Naver zoom', () => {
-  it('facade 0 → naver min (1)', () => {
-    expect(toNaverZoom(0)).toBe(1);
+describe('Naver zoom (identity with facade)', () => {
+  it('facade 7 → naver 7', () => {
+    expect(toNaverZoom(7)).toBe(7);
   });
 
-  it('facade 22 → naver max (21)', () => {
-    expect(toNaverZoom(22)).toBe(21);
+  it('facade 19 → naver 19', () => {
+    expect(toNaverZoom(19)).toBe(19);
   });
 
-  it('output is always within Naver range 1–21', () => {
+  it('facade 14 → naver 14', () => {
+    expect(toNaverZoom(14)).toBe(14);
+  });
+
+  it('output is always within range 7–19', () => {
     for (let z = 0; z <= 22; z++) {
       const nz = toNaverZoom(z);
-      expect(nz).toBeGreaterThanOrEqual(1);
-      expect(nz).toBeLessThanOrEqual(21);
+      expect(nz).toBeGreaterThanOrEqual(7);
+      expect(nz).toBeLessThanOrEqual(19);
     }
   });
 
   it('same direction: higher facade zoom → higher naver zoom', () => {
-    expect(toNaverZoom(10)).toBeGreaterThan(toNaverZoom(5));
-    expect(toNaverZoom(20)).toBeGreaterThan(toNaverZoom(10));
+    expect(toNaverZoom(15)).toBeGreaterThan(toNaverZoom(10));
   });
 
-  it('fromNaverZoom output is always within facade range 0–22', () => {
-    for (let nz = 1; nz <= 21; nz++) {
-      const fz = fromNaverZoom(nz);
-      expect(fz).toBeGreaterThanOrEqual(0);
-      expect(fz).toBeLessThanOrEqual(22);
+  it('round-trip: fromNaverZoom(toNaverZoom(z)) === z', () => {
+    for (let z = 7; z <= 19; z++) {
+      expect(fromNaverZoom(toNaverZoom(z))).toBe(z);
     }
-  });
-
-  it('round-trip: fromNaverZoom(toNaverZoom(z)) ≈ z', () => {
-    // Round-trip is approximate due to integer rounding in both directions
-    for (let z = 0; z <= 22; z++) {
-      const rt = fromNaverZoom(toNaverZoom(z));
-      expect(Math.abs(rt - z)).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it('naver 1 → facade near 0', () => {
-    expect(fromNaverZoom(1)).toBeLessThanOrEqual(2);
-  });
-
-  it('naver 21 → facade near 22', () => {
-    expect(fromNaverZoom(21)).toBeGreaterThanOrEqual(20);
   });
 });
 
 describe('Kakao zoom', () => {
-  it('facade 0 → kakao max (14, country level)', () => {
-    expect(toKakaoZoom(0)).toBe(14);
+  // kakaoLevel = 20 - facadeZoom
+
+  it('facade 7 → kakao 13', () => {
+    expect(toKakaoZoom(7)).toBe(13);
   });
 
-  it('facade 22 → kakao min (1, street level)', () => {
-    expect(toKakaoZoom(22)).toBe(1);
+  it('facade 11 → kakao 9', () => {
+    expect(toKakaoZoom(11)).toBe(9);
   });
 
-  it('output is always within Kakao range 1–14', () => {
+  it('facade 14 → kakao 6', () => {
+    expect(toKakaoZoom(14)).toBe(6);
+  });
+
+  it('facade 17 → kakao 3', () => {
+    expect(toKakaoZoom(17)).toBe(3);
+  });
+
+  it('facade 19 → kakao 1', () => {
+    expect(toKakaoZoom(19)).toBe(1);
+  });
+
+  it('output is always within Kakao range 1–13', () => {
     for (let z = 0; z <= 22; z++) {
       const kz = toKakaoZoom(z);
       expect(kz).toBeGreaterThanOrEqual(1);
-      expect(kz).toBeLessThanOrEqual(14);
+      expect(kz).toBeLessThanOrEqual(13);
     }
   });
 
-  it('inverted: higher facade zoom → lower kakao zoom', () => {
-    expect(toKakaoZoom(20)).toBeLessThan(toKakaoZoom(5));
-    expect(toKakaoZoom(15)).toBeLessThan(toKakaoZoom(5));
+  it('inverted: higher facade zoom → lower kakao level', () => {
+    expect(toKakaoZoom(17)).toBeLessThan(toKakaoZoom(10));
   });
 
-  it('fromKakaoZoom output is always within facade range 0–22', () => {
-    for (let kz = 1; kz <= 14; kz++) {
+  it('fromKakaoZoom output is always within facade range 7–19', () => {
+    for (let kz = 1; kz <= 13; kz++) {
       const fz = fromKakaoZoom(kz);
-      expect(fz).toBeGreaterThanOrEqual(0);
-      expect(fz).toBeLessThanOrEqual(22);
+      expect(fz).toBeGreaterThanOrEqual(7);
+      expect(fz).toBeLessThanOrEqual(19);
     }
   });
 
-  it('round-trip: fromKakaoZoom(toKakaoZoom(z)) ≈ z', () => {
-    for (let z = 0; z <= 22; z++) {
-      const rt = fromKakaoZoom(toKakaoZoom(z));
-      expect(Math.abs(rt - z)).toBeLessThanOrEqual(2);
+  it('exact round-trip for all valid kakao levels', () => {
+    for (let z = 7; z <= 19; z++) {
+      expect(fromKakaoZoom(toKakaoZoom(z))).toBe(z);
     }
   });
 
-  it('kakao 14 → facade near 0', () => {
-    expect(fromKakaoZoom(14)).toBeLessThanOrEqual(3);
+  it('kakao 13 → facade 7', () => {
+    expect(fromKakaoZoom(13)).toBe(7);
   });
 
-  it('kakao 1 → facade near 22', () => {
-    expect(fromKakaoZoom(1)).toBeGreaterThanOrEqual(19);
+  it('kakao 1 → facade 19', () => {
+    expect(fromKakaoZoom(1)).toBe(19);
   });
 });
 
 describe('clampFacadeZoom', () => {
-  it('clamps below 0', () => {
-    expect(clampFacadeZoom(-1)).toBe(0);
-    expect(clampFacadeZoom(-100)).toBe(0);
+  it('clamps below 7', () => {
+    expect(clampFacadeZoom(0)).toBe(7);
+    expect(clampFacadeZoom(6)).toBe(7);
   });
 
-  it('clamps above 22', () => {
-    expect(clampFacadeZoom(23)).toBe(22);
-    expect(clampFacadeZoom(100)).toBe(22);
+  it('clamps above 19', () => {
+    expect(clampFacadeZoom(20)).toBe(19);
+    expect(clampFacadeZoom(22)).toBe(19);
   });
 
   it('passes through values in range', () => {
-    expect(clampFacadeZoom(0)).toBe(0);
-    expect(clampFacadeZoom(11)).toBe(11);
-    expect(clampFacadeZoom(22)).toBe(22);
+    expect(clampFacadeZoom(7)).toBe(7);
+    expect(clampFacadeZoom(12)).toBe(12);
+    expect(clampFacadeZoom(19)).toBe(19);
   });
 });

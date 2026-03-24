@@ -5,7 +5,7 @@ let loadPromise: Promise<void> | null = null;
 /**
  * Idempotently loads the Google Maps SDK via dynamic script injection.
  */
-export function loadGoogleSdk(apiKey: string, libraries: string[] = []): Promise<void> {
+export function loadGoogleSdk(apiKey: string, libraries: string[] = ['marker']): Promise<void> {
   if (loadPromise) return loadPromise;
 
   loadPromise = new Promise<void>((resolve, reject) => {

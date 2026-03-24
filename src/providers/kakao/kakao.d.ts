@@ -46,6 +46,8 @@ declare namespace kakao {
     interface MapOptions {
       center: LatLng;
       level: number;
+      minLevel?: number;
+      maxLevel?: number;
       mapTypeId?: MapTypeId;
     }
 

@@ -1,33 +1,30 @@
 // ---------------------------------------------------------------------------
-// Facade zoom scale: 0–22 (Google-style)
-//   0  = world view
-//   22 = building level
+// Facade zoom scale: 7–19 (Google/Naver-equivalent range)
+//   7  = country/region view
+//   19 = street level
 //
-// Naver zoom scale: 1–21
-//   1  = country/world (zoomed out)
-//   21 = building (zoomed in)
-//   Same direction as facade, different range.
+// Naver zoom scale: 7–19  (identity with facade in this range)
+// Google zoom scale: 7–19 (identity with facade in this range)
 //
-// Kakao zoom scale: 1–14
-//   1  = street (zoomed in)   ← INVERTED relative to facade and Naver
-//   14 = country (zoomed out)
+// Kakao zoom scale: 1–13 (inverted, offset 20)
+//   kakaoLevel = 20 − facadeZoom
+//   facade 7  → kakao 13 (zoomed out)
+//   facade 19 → kakao 1  (zoomed in)
 // ---------------------------------------------------------------------------
 
-const FACADE_MIN = 0;
-const FACADE_MAX = 22;
-
-const NAVER_MIN = 1;
-const NAVER_MAX = 21;
+const FACADE_MIN = 7;
+const FACADE_MAX = 19;
 
 const KAKAO_MIN = 1;
-const KAKAO_MAX = 14;
+const KAKAO_MAX = 13;
+const KAKAO_OFFSET = 20;
 
 export function clampFacadeZoom(zoom: number): number {
-  return Math.max(FACADE_MIN, Math.min(FACADE_MAX, Math.round(zoom)));
+  return Math.max(FACADE_MIN, Math.min(FACADE_MAX, zoom));
 }
 
 // ---------------------------------------------------------------------------
-// Google (identity — facade IS the Google scale)
+// Google (identity — facade IS the Google scale in this range)
 // ---------------------------------------------------------------------------
 
 export function toGoogleZoom(facadeZoom: number): number {
@@ -39,39 +36,30 @@ export function fromGoogleZoom(googleZoom: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Naver
-// Linear map: facade [0,22] → naver [1,21]
+// Naver (identity — Naver zoom equals Google zoom in the 7–19 range)
 // ---------------------------------------------------------------------------
 
 export function toNaverZoom(facadeZoom: number): number {
-  const clamped = clampFacadeZoom(facadeZoom);
-  const ratio = clamped / FACADE_MAX;
-  return Math.round(NAVER_MIN + ratio * (NAVER_MAX - NAVER_MIN));
+  return Math.round(clampFacadeZoom(facadeZoom));
 }
 
 export function fromNaverZoom(naverZoom: number): number {
-  const clamped = Math.max(NAVER_MIN, Math.min(NAVER_MAX, Math.round(naverZoom)));
-  const ratio = (clamped - NAVER_MIN) / (NAVER_MAX - NAVER_MIN);
-  return Math.round(ratio * FACADE_MAX);
+  return Math.round(clampFacadeZoom(naverZoom));
 }
 
 // ---------------------------------------------------------------------------
 // Kakao
-// Inverted linear map: facade [0,22] → kakao [14,1]
-// facade 0  → kakao 14 (world)
-// facade 22 → kakao 1  (street)
+// kakaoLevel = 20 − facadeZoom  (inverted, offset 20)
+// facade 7  → kakao 13
+// facade 19 → kakao 1
 // ---------------------------------------------------------------------------
 
 export function toKakaoZoom(facadeZoom: number): number {
   const clamped = clampFacadeZoom(facadeZoom);
-  const ratio = clamped / FACADE_MAX;
-  // Invert: as facade increases, kakao decreases
-  return Math.round(KAKAO_MAX - ratio * (KAKAO_MAX - KAKAO_MIN));
+  return Math.max(KAKAO_MIN, Math.min(KAKAO_MAX, Math.round(KAKAO_OFFSET - clamped)));
 }
 
 export function fromKakaoZoom(kakaoZoom: number): number {
   const clamped = Math.max(KAKAO_MIN, Math.min(KAKAO_MAX, Math.round(kakaoZoom)));
-  // Invert back
-  const ratio = (KAKAO_MAX - clamped) / (KAKAO_MAX - KAKAO_MIN);
-  return Math.round(ratio * FACADE_MAX);
+  return Math.round(clampFacadeZoom(KAKAO_OFFSET - clamped));
 }

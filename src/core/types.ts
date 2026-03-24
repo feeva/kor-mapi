@@ -84,6 +84,8 @@ export interface KorMapConfig<P extends MapProvider = MapProvider> {
   /** Facade zoom level 0–22 (Google-style). Default: 10 */
   zoom?: number;
   mapType?: MapTypeId;
+  /** Google Maps: Map ID required for AdvancedMarkerElement. Defaults to 'DEMO_MAP_ID' for development. */
+  mapId?: string;
   /** Proxy URL for Naver/Kakao routing REST calls (required for routing on these providers) */
   proxyUrl?: string;
 }
@@ -125,8 +127,8 @@ export type OverlayEvent =
 
 export interface MapMouseEvent {
   latlng: LatLng;
-  point: Point;
-  domEvent: MouseEvent;
+  point?: Point;
+  domEvent?: MouseEvent;
 }
 
 /** Opaque token returned by on() / once(), used to call off() */

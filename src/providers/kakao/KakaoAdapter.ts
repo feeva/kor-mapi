@@ -14,22 +14,24 @@ import {
 } from '../../core/types.js';
 
 // ---------------------------------------------------------------------------
-// MapTypeId mapping
+// MapTypeId mapping (runtime functions — avoids module-load-time SDK access)
 // ---------------------------------------------------------------------------
 
-const FACADE_TO_KAKAO_TYPE: Record<MapTypeId, kakao.maps.MapTypeId> = {
-  [MapTypeId.ROADMAP]: 'ROADMAP',
-  [MapTypeId.SATELLITE]: 'SKYVIEW',
-  [MapTypeId.HYBRID]: 'HYBRID',
-  [MapTypeId.TERRAIN]: 'TERRAIN',
-};
+function toKakaoMapType(type: MapTypeId): kakao.maps.MapTypeId {
+  switch (type) {
+    case MapTypeId.SATELLITE: return kakao.maps.MapTypeId.SKYVIEW;
+    case MapTypeId.HYBRID:    return kakao.maps.MapTypeId.HYBRID;
+    // Kakao TERRAIN is an overlay type, not a standalone base map — use ROADMAP
+    default:                  return kakao.maps.MapTypeId.ROADMAP;
+  }
+}
 
-const KAKAO_TO_FACADE_TYPE: Record<string, MapTypeId> = {
-  ROADMAP: MapTypeId.ROADMAP,
-  SKYVIEW: MapTypeId.SATELLITE,
-  HYBRID: MapTypeId.HYBRID,
-  TERRAIN: MapTypeId.TERRAIN,
-};
+function fromKakaoMapType(typeId: string): MapTypeId {
+  if (typeId === kakao.maps.MapTypeId.SKYVIEW)  return MapTypeId.SATELLITE;
+  if (typeId === kakao.maps.MapTypeId.HYBRID)   return MapTypeId.HYBRID;
+  if (typeId === kakao.maps.MapTypeId.TERRAIN)  return MapTypeId.TERRAIN;
+  return MapTypeId.ROADMAP;
+}
 
 // ---------------------------------------------------------------------------
 // Event name mapping
@@ -52,6 +54,8 @@ const FACADE_TO_KAKAO_EVENT: Partial<Record<KorMapEvent, string>> = {
 };
 
 const SUPPORTED_FEATURES: KorMapFeature[] = [];
+
+const POINTER_EVENTS = new Set<KorMapEvent>(['click', 'dblclick', 'rightclick']);
 
 // ---------------------------------------------------------------------------
 // Adapter
@@ -86,7 +90,9 @@ export class KakaoAdapter implements IMapProvider {
     this.map = new kakao.maps.Map(container, {
       center: new kakao.maps.LatLng(center.lat, center.lng),
       level: toKakaoZoom(zoom),
-      mapTypeId: config.mapType ? FACADE_TO_KAKAO_TYPE[config.mapType] : undefined,
+      minLevel: 1,
+      maxLevel: 13,
+      ...(config.mapType && { mapTypeId: toKakaoMapType(config.mapType) }),
     });
   }
 
@@ -113,7 +119,10 @@ export class KakaoAdapter implements IMapProvider {
   }
 
   setZoom(zoom: number): void {
-    this.map.setLevel(toKakaoZoom(zoom));
+    const level = toKakaoZoom(zoom);
+    if (level !== this.map.getLevel()) {
+      this.map.setLevel(level);
+    }
   }
 
   getZoom(): number {
@@ -152,12 +161,14 @@ export class KakaoAdapter implements IMapProvider {
   // -------------------------------------------------------------------------
 
   setMapType(type: MapTypeId): void {
-    this.map.setMapTypeId(FACADE_TO_KAKAO_TYPE[type]);
+    const level = this.map.getLevel(); // setMapTypeId can fire zoom_changed internally
+    this.map.setMapTypeId(toKakaoMapType(type));
+    if (this.map.getLevel() !== level) this.map.setLevel(level);
   }
 
   getMapType(): MapTypeId {
     const raw = this.map.getMapTypeId();
-    return KAKAO_TO_FACADE_TYPE[raw as string] ?? MapTypeId.ROADMAP;
+    return fromKakaoMapType(raw as string);
   }
 
   // -------------------------------------------------------------------------
@@ -181,7 +192,11 @@ export class KakaoAdapter implements IMapProvider {
     } else {
       const kakaoEvent = FACADE_TO_KAKAO_EVENT[event];
       if (kakaoEvent) {
-        kakao.maps.event.addListener(this.map, kakaoEvent, handler as kakao.maps.AnyListener);
+        const wrapped = POINTER_EVENTS.has(event)
+          ? (e: { latLng: kakao.maps.LatLng }) =>
+              (handler as (ev: { latlng: LatLng }) => void)({ latlng: { lat: e.latLng.getLat(), lng: e.latLng.getLng() } })
+          : handler as kakao.maps.AnyListener;
+        kakao.maps.event.addListener(this.map, kakaoEvent, wrapped as kakao.maps.AnyListener);
       }
     }
 

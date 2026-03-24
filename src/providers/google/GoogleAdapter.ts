@@ -10,18 +10,21 @@ import {
   type MarkerOptions, type InfoWindowOptions,
   type PolylineOptions, type PolygonOptions, type CircleOptions,
   type RectangleOptions, type CustomOverlayOptions, type TileLayerOptions,
-  MapTypeId, MarkerAnimation,
+  MapTypeId,
 } from '../../core/types.js';
 
 // ---------------------------------------------------------------------------
 // MapTypeId mapping (facade uses same string values as Google)
 // ---------------------------------------------------------------------------
 
-const FACADE_TO_GOOGLE_TYPE: Record<MapTypeId, google.maps.MapTypeId> = {
-  [MapTypeId.ROADMAP]: google.maps.MapTypeId.ROADMAP,
-  [MapTypeId.SATELLITE]: google.maps.MapTypeId.SATELLITE,
-  [MapTypeId.HYBRID]: google.maps.MapTypeId.HYBRID,
-  [MapTypeId.TERRAIN]: google.maps.MapTypeId.TERRAIN,
+// Google's MapTypeId string values are identical to our MapTypeId enum values,
+// so we use string literals here to avoid referencing `google` at module load time
+// (the SDK is loaded dynamically; accessing google.maps.* before init crashes).
+const FACADE_TO_GOOGLE_TYPE: Record<MapTypeId, string> = {
+  [MapTypeId.ROADMAP]: 'roadmap',
+  [MapTypeId.SATELLITE]: 'satellite',
+  [MapTypeId.HYBRID]: 'hybrid',
+  [MapTypeId.TERRAIN]: 'terrain',
 };
 
 const GOOGLE_TO_FACADE_TYPE: Record<string, MapTypeId> = {
@@ -52,6 +55,8 @@ const FACADE_TO_GOOGLE_EVENT: Partial<Record<KorMapEvent, string>> = {
 
 const SUPPORTED_FEATURES: KorMapFeature[] = ['elevation', 'streetview', 'heatmap', 'drawing', 'mapStyles', 'tilt', 'heading', 'trafficLayer'];
 
+const POINTER_EVENTS = new Set<KorMapEvent>(['click', 'dblclick', 'rightclick']);
+
 // ---------------------------------------------------------------------------
 // Adapter
 // ---------------------------------------------------------------------------
@@ -60,7 +65,7 @@ export class GoogleAdapter implements IMapProvider {
   readonly provider = 'google' as const;
 
   private map!: google.maps.Map;
-  private readonly markerReg = new HandleRegistry<google.maps.Marker>();
+  private readonly markerReg = new HandleRegistry<google.maps.marker.AdvancedMarkerElement>();
   private readonly overlayReg = new HandleRegistry<google.maps.Polyline | google.maps.Polygon | google.maps.Circle | google.maps.Rectangle | google.maps.OverlayView | google.maps.ImageMapType>();
   private readonly infoWindowReg = new HandleRegistry<google.maps.InfoWindow>();
   // Track MapsEventListeners for proper cleanup
@@ -81,7 +86,10 @@ export class GoogleAdapter implements IMapProvider {
     this.map = new google.maps.Map(container, {
       center: new google.maps.LatLng(center.lat, center.lng),
       zoom: toGoogleZoom(zoom),
-      mapTypeId: config.mapType ? FACADE_TO_GOOGLE_TYPE[config.mapType] : undefined,
+      minZoom: 7,
+      maxZoom: 19,
+      mapId: config.mapId ?? 'DEMO_MAP_ID',
+      ...(config.mapType && { mapTypeId: FACADE_TO_GOOGLE_TYPE[config.mapType] as google.maps.MapTypeId }),
     });
   }
 
@@ -172,10 +180,14 @@ export class GoogleAdapter implements IMapProvider {
     const listener = makeEventListener(event);
 
     if (googleEvent) {
+      const wrapped = POINTER_EVENTS.has(event)
+        ? (e: { latLng: google.maps.LatLng | null }) =>
+            (handler as (ev: { latlng: LatLng }) => void)({ latlng: { lat: e.latLng?.lat() ?? 0, lng: e.latLng?.lng() ?? 0 } })
+        : handler as google.maps.AnyListener;
       const mapsListener = google.maps.event.addListener(
         this.map,
         googleEvent,
-        handler as google.maps.AnyListener,
+        wrapped as google.maps.AnyListener,
       );
       this.eventListeners.set(++this.eventListenerIdCounter, mapsListener);
     }
@@ -201,51 +213,36 @@ export class GoogleAdapter implements IMapProvider {
   // -------------------------------------------------------------------------
 
   addMarker(options: MarkerOptions): NativeMarkerHandle {
-    const marker = new google.maps.Marker({
+    const content = buildAdvancedMarkerContent(options);
+    const marker = new google.maps.marker.AdvancedMarkerElement({
       map: this.map,
-      position: new google.maps.LatLng(options.position.lat, options.position.lng),
-      icon: buildGoogleIcon(options.icon),
-      title: options.title,
-      zIndex: options.zIndex,
-      visible: options.visible,
-      draggable: options.draggable,
-      opacity: options.opacity,
-      clickable: options.clickable,
-      label: options.label
-        ? { text: options.label.text, color: options.label.color, fontSize: options.label.fontSize, fontWeight: options.label.fontWeight }
-        : undefined,
-      animation: options.animation
-        ? options.animation === MarkerAnimation.BOUNCE
-          ? google.maps.Animation.BOUNCE
-          : google.maps.Animation.DROP
-        : undefined,
+      position: { lat: options.position.lat, lng: options.position.lng },
+      title: options.title ?? '',
+      content,
+      gmpClickable: options.clickable ?? true,
+      gmpDraggable: options.draggable ?? false,
+      zIndex: options.zIndex ?? null,
     });
+    if (options.visible === false && marker.content) marker.content.style.display = 'none';
+    if (options.opacity !== undefined && marker.content) marker.content.style.opacity = String(options.opacity);
     return makeHandle(this.markerReg.register(marker));
   }
 
   removeMarker(handle: NativeMarkerHandle): void {
-    this.markerReg.get(handle._handleId).setMap(null);
+    this.markerReg.get(handle._handleId).map = null;
     this.markerReg.delete(handle._handleId);
   }
 
   updateMarker(handle: NativeMarkerHandle, options: Partial<MarkerOptions>): void {
     const marker = this.markerReg.get(handle._handleId);
-    if (options.position) marker.setPosition(new google.maps.LatLng(options.position.lat, options.position.lng));
-    if (options.icon !== undefined) marker.setIcon(buildGoogleIcon(options.icon) ?? '');
-    if (options.title !== undefined) marker.setTitle(options.title);
-    if (options.visible !== undefined) marker.setVisible(options.visible);
-    if (options.draggable !== undefined) marker.setDraggable(options.draggable);
-    if (options.clickable !== undefined) marker.setClickable(options.clickable);
-    if (options.zIndex !== undefined) marker.setZIndex(options.zIndex);
-    if (options.opacity !== undefined) marker.setOpacity(options.opacity);
-    if (options.label !== undefined) marker.setLabel(options.label ?? null as unknown as string);
-    if (options.animation !== undefined) {
-      marker.setAnimation(
-        options.animation === null ? null
-          : options.animation === MarkerAnimation.BOUNCE ? google.maps.Animation.BOUNCE
-          : google.maps.Animation.DROP,
-      );
-    }
+    if (options.position) marker.position = { lat: options.position.lat, lng: options.position.lng };
+    if (options.title !== undefined) marker.title = options.title ?? '';
+    if (options.zIndex !== undefined) marker.zIndex = options.zIndex ?? null;
+    if (options.draggable !== undefined) marker.gmpDraggable = options.draggable;
+    if (options.clickable !== undefined) marker.gmpClickable = options.clickable;
+    if (options.icon !== undefined) marker.content = buildAdvancedMarkerContent(options as MarkerOptions) ?? null;
+    if (options.visible !== undefined && marker.content) marker.content.style.display = options.visible ? '' : 'none';
+    if (options.opacity !== undefined && marker.content) marker.content.style.opacity = String(options.opacity);
   }
 
   addMarkerEvent(handle: NativeMarkerHandle, event: OverlayEvent, handler: AnyEventHandler): EventListener {
@@ -272,8 +269,8 @@ export class GoogleAdapter implements IMapProvider {
       disableAutoPan: options.disableAutoPan,
       zIndex: options.zIndex,
     });
-    const marker = anchor ? this.markerReg.get(anchor._handleId) : undefined;
-    iw.open({ map: this.map, anchor: marker });
+    const advMarker = anchor ? this.markerReg.get(anchor._handleId) : undefined;
+    iw.open({ map: this.map, anchor: advMarker });
     return makeHandle(this.infoWindowReg.register(iw));
   }
 
@@ -537,14 +534,34 @@ function toGooglePaths(paths: LatLng[] | LatLng[][]): google.maps.LatLng[] | goo
   return (paths as LatLng[]).map(toGoogleLatLng);
 }
 
-function buildGoogleIcon(icon: MarkerOptions['icon']): string | google.maps.Icon | undefined {
-  if (!icon) return undefined;
-  if (typeof icon === 'string') return icon;
-  return {
-    url: icon.url,
-    size: icon.size ? new google.maps.Size(icon.size.width, icon.size.height) : undefined,
-    scaledSize: icon.scaledSize ? new google.maps.Size(icon.scaledSize.width, icon.scaledSize.height) : undefined,
-    origin: icon.origin ? new google.maps.Point(icon.origin.x, icon.origin.y) : undefined,
-    anchor: icon.anchor ? new google.maps.Point(icon.anchor.x, icon.anchor.y) : undefined,
-  };
+function buildAdvancedMarkerContent(options: MarkerOptions | Partial<MarkerOptions>): HTMLElement | undefined {
+  const { icon, label } = options;
+  if (!icon && !label) return undefined; // use default Google pin
+
+  const container = document.createElement('div');
+  container.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer';
+
+  if (icon) {
+    const img = document.createElement('img');
+    img.src = typeof icon === 'string' ? icon : icon.url;
+    if (typeof icon === 'object') {
+      const sz = icon.scaledSize ?? icon.size;
+      if (sz) { img.style.width = `${sz.width}px`; img.style.height = `${sz.height}px`; }
+    }
+    container.appendChild(img);
+  }
+
+  if (label) {
+    const span = document.createElement('span');
+    span.textContent = label.text;
+    span.style.cssText = [
+      `color:${label.color ?? '#000'}`,
+      `font-size:${label.fontSize ?? '12px'}`,
+      `font-weight:${label.fontWeight ?? 'normal'}`,
+      'white-space:nowrap',
+    ].join(';');
+    container.appendChild(span);
+  }
+
+  return container;
 }

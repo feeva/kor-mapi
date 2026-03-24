@@ -49,8 +49,11 @@ declare namespace google {
     interface MapOptions {
       center?: LatLng;
       zoom?: number;
+      minZoom?: number;
+      maxZoom?: number;
       mapTypeId?: MapTypeId;
       disableDefaultUI?: boolean;
+      mapId?: string;
     }
 
     class Map {
@@ -125,7 +128,7 @@ declare namespace google {
 
     class InfoWindow {
       constructor(opts?: InfoWindowOptions);
-      open(opts?: { map?: Map; anchor?: Marker }): void;
+      open(opts?: { map?: Map; anchor?: Marker | marker.AdvancedMarkerElement }): void;
       close(): void;
       setContent(content: string | HTMLElement): void;
       getContent(): string | HTMLElement | null;
@@ -279,6 +282,30 @@ declare namespace google {
       function addListener(instance: object, eventName: string, handler: AnyListener): MapsEventListener;
       function removeListener(listener: MapsEventListener): void;
       function trigger(instance: object, eventName: string, ...args: unknown[]): void;
+    }
+
+    namespace marker {
+      interface AdvancedMarkerElementOptions {
+        map?: Map;
+        position?: { lat: number; lng: number } | LatLng | null;
+        title?: string;
+        content?: HTMLElement | null;
+        gmpClickable?: boolean;
+        gmpDraggable?: boolean;
+        zIndex?: number | null;
+      }
+
+      class AdvancedMarkerElement {
+        constructor(options?: AdvancedMarkerElementOptions);
+        map: Map | null;
+        position: { lat: number; lng: number } | LatLng | null;
+        title: string;
+        content: HTMLElement | null;
+        zIndex: number | null;
+        gmpDraggable: boolean;
+        gmpClickable: boolean;
+        addListener(eventName: string, handler: AnyListener): MapsEventListener;
+      }
     }
   }
 }

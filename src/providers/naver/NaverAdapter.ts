@@ -17,19 +17,23 @@ import {
 // MapTypeId mapping
 // ---------------------------------------------------------------------------
 
-const FACADE_TO_NAVER_TYPE: Record<MapTypeId, naver.maps.MapTypeId> = {
-  [MapTypeId.ROADMAP]: 'NORMAL',
-  [MapTypeId.SATELLITE]: 'SATELLITE',
-  [MapTypeId.HYBRID]: 'HYBRID',
-  [MapTypeId.TERRAIN]: 'TERRAIN',
-};
+// Resolved at call time (after SDK loads) so we use the SDK's actual runtime values,
+// not hardcoded strings that may not match what the loaded version expects.
+function toNaverMapType(type: MapTypeId): naver.maps.MapTypeId {
+  switch (type) {
+    case MapTypeId.SATELLITE: return naver.maps.MapTypeId.SATELLITE;
+    case MapTypeId.HYBRID:    return naver.maps.MapTypeId.HYBRID;
+    case MapTypeId.TERRAIN:   return naver.maps.MapTypeId.TERRAIN;
+    default:                  return naver.maps.MapTypeId.NORMAL;
+  }
+}
 
-const NAVER_TO_FACADE_TYPE: Record<string, MapTypeId> = {
-  NORMAL: MapTypeId.ROADMAP,
-  SATELLITE: MapTypeId.SATELLITE,
-  HYBRID: MapTypeId.HYBRID,
-  TERRAIN: MapTypeId.TERRAIN,
-};
+function fromNaverMapType(typeId: string): MapTypeId {
+  if (typeId === naver.maps.MapTypeId.SATELLITE) return MapTypeId.SATELLITE;
+  if (typeId === naver.maps.MapTypeId.HYBRID)    return MapTypeId.HYBRID;
+  if (typeId === naver.maps.MapTypeId.TERRAIN)   return MapTypeId.TERRAIN;
+  return MapTypeId.ROADMAP;
+}
 
 // ---------------------------------------------------------------------------
 // Event name mapping (Naver event names mostly match facade names)
@@ -51,6 +55,8 @@ const FACADE_TO_NAVER_EVENT: Partial<Record<KorMapEvent, string>> = {
 };
 
 const SUPPORTED_FEATURES: KorMapFeature[] = [];
+
+const POINTER_EVENTS = new Set<KorMapEvent>(['click', 'dblclick', 'rightclick']);
 
 // ---------------------------------------------------------------------------
 // Adapter
@@ -75,10 +81,16 @@ export class NaverAdapter implements IMapProvider {
     const center = config.center ?? { lat: 37.5665, lng: 126.9780 };
     const zoom = config.zoom ?? 10;
 
-    this.map = new naver.maps.Map(container, {
+    // All official Naver Maps examples pass a string ID, not an HTMLElement.
+    // Use the element's id when available to match that code path.
+    const mapTarget: string | HTMLElement = container.id ? container.id : container;
+
+    this.map = new naver.maps.Map(mapTarget, {
       center: new naver.maps.LatLng(center.lat, center.lng),
       zoom: toNaverZoom(zoom),
-      mapTypeId: config.mapType ? FACADE_TO_NAVER_TYPE[config.mapType] : undefined,
+      minZoom: 7,
+      maxZoom: 19,
+      ...(config.mapType && { mapTypeId: toNaverMapType(config.mapType) }),
     });
   }
 
@@ -141,11 +153,11 @@ export class NaverAdapter implements IMapProvider {
   // -------------------------------------------------------------------------
 
   setMapType(type: MapTypeId): void {
-    this.map.setMapTypeId(FACADE_TO_NAVER_TYPE[type]);
+    this.map.setMapTypeId(toNaverMapType(type));
   }
 
   getMapType(): MapTypeId {
-    return NAVER_TO_FACADE_TYPE[this.map.getMapTypeId()] ?? MapTypeId.ROADMAP;
+    return fromNaverMapType(this.map.getMapTypeId());
   }
 
   // -------------------------------------------------------------------------
@@ -163,7 +175,11 @@ export class NaverAdapter implements IMapProvider {
   on(event: KorMapEvent, handler: AnyEventHandler): EventListener {
     const naverEvent = FACADE_TO_NAVER_EVENT[event];
     if (naverEvent) {
-      naver.maps.Event.addListener(this.map, naverEvent, handler as naver.maps.AnyListener);
+      const wrapped = POINTER_EVENTS.has(event)
+        ? (e: { coord: naver.maps.LatLng }) =>
+            (handler as (ev: { latlng: LatLng }) => void)({ latlng: { lat: e.coord.lat(), lng: e.coord.lng() } })
+        : handler as naver.maps.AnyListener;
+      naver.maps.Event.addListener(this.map, naverEvent, wrapped as naver.maps.AnyListener);
     }
     return makeEventListener(event);
   }

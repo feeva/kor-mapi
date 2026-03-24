@@ -43,7 +43,13 @@ declare namespace naver {
     interface MapOptions {
       center: LatLng;
       zoom: number;
+      minZoom?: number;
+      maxZoom?: number;
       mapTypeId?: MapTypeId;
+      /** Explicit pixel size. Required when the container uses percentage/flex sizing
+       *  rather than inline pixel styles — Naver reads container.style dimensions,
+       *  not computed/offset dimensions. */
+      size?: Size;
     }
 
     class Map {

@@ -125,7 +125,10 @@ export class KorMap<P extends MapProvider = MapProvider> {
 
 function resolveContainer(container: HTMLElement | string): HTMLElement {
   if (typeof container === 'string') {
-    const el = document.querySelector<HTMLElement>(container);
+    // Bare string without CSS selector prefix → treat as element ID
+    const el = /^[#.[[]/.test(container)
+      ? document.querySelector<HTMLElement>(container)
+      : document.getElementById(container);
     if (!el) throw new ConfigurationError(`Container element not found: "${container}"`);
     return el;
   }
