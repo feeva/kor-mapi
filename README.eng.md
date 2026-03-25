@@ -1,5 +1,7 @@
 # kor-mapi
 
+[한국어](README.md) | [English](README.eng.md)
+
 A provider-agnostic Korean map facade that abstracts **Naver Maps**, **Kakao Maps**, and **Google Maps** behind a single unified TypeScript API.
 
 ## Why

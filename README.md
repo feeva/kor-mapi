@@ -1,5 +1,7 @@
 # kor-mapi
 
+[한국어](README.md) | [English](README.eng.md)
+
 **네이버 지도**, **카카오맵**, **구글 지도** API를 하나의 API로 추상화한 한국 지도 파사드입니다.
 
 ## 배경
