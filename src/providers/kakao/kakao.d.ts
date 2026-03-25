@@ -23,6 +23,11 @@ declare namespace kakao {
 
     class Point {
       constructor(x: number, y: number);
+      // Direct properties (actual runtime behaviour of Projection methods)
+      x: number;
+      y: number;
+      // Legacy getter methods (present on constructed instances but not on
+      // projection-returned objects in some SDK versions)
       getX(): number;
       getY(): number;
     }
@@ -196,6 +201,28 @@ declare namespace kakao {
       getMap(): Map | null;
       getPanels(): { overlayLayer: HTMLElement };
       getProjection(): Projection;
+    }
+
+    interface CustomOverlayOptions {
+      position: LatLng;
+      content: HTMLElement | string;
+      xAnchor?: number;
+      yAnchor?: number;
+      zIndex?: number;
+      map?: Map;
+      clickable?: boolean;
+    }
+
+    class CustomOverlay {
+      constructor(options: CustomOverlayOptions);
+      setMap(map: Map | null): void;
+      getMap(): Map | null;
+      setPosition(position: LatLng): void;
+      getPosition(): LatLng;
+      setContent(content: HTMLElement | string): void;
+      getContent(): HTMLElement | string;
+      setZIndex(zIndex: number): void;
+      getZIndex(): number;
     }
 
     class Projection {

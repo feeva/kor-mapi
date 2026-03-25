@@ -295,3 +295,32 @@ export interface PanOptions {
   animate?: boolean;
   duration?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Marker clustering
+// ---------------------------------------------------------------------------
+
+export interface ClusterStyle {
+  /** Custom icon URL. If omitted, a default filled circle is rendered. */
+  url?: string;
+  width: number;
+  height: number;
+  textColor?: string;
+  textSize?: number;
+  backgroundColor?: string;
+  /** Pixel offset [x, y] from the anchor point to the top-left of the element. */
+  anchor?: [number, number];
+}
+
+export interface ClusterOptions {
+  /** Minimum number of markers required to form a cluster. Default: 2 */
+  minClusterSize?: number;
+  /** Above this facade zoom level, clustering is disabled. Default: 15 */
+  maxZoom?: number;
+  /** Size of each grid cell in pixels. Default: 60 */
+  gridSize?: number;
+  /** Per-tier styles (index 0 = small, 1 = medium, 2 = large). Defaults to built-in circles. */
+  styles?: ClusterStyle[];
+  /** Place cluster pin at centroid of its markers. Default: false (uses first marker position) */
+  averageCenter?: boolean;
+}

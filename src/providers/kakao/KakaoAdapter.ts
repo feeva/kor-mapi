@@ -66,7 +66,7 @@ export class KakaoAdapter implements IMapProvider {
 
   private map!: kakao.maps.Map;
   private readonly markerReg = new HandleRegistry<kakao.maps.Marker>();
-  private readonly overlayReg = new HandleRegistry<kakao.maps.Polyline | kakao.maps.Polygon | kakao.maps.Circle | kakao.maps.Rectangle | kakao.maps.AbstractOverlay>();
+  private readonly overlayReg = new HandleRegistry<kakao.maps.Polyline | kakao.maps.Polygon | kakao.maps.Circle | kakao.maps.Rectangle | kakao.maps.AbstractOverlay | kakao.maps.CustomOverlay>();
   private readonly infoWindowReg = new HandleRegistry<kakao.maps.InfoWindow>();
 
   // Listener bookkeeping: handle id → [ { event, nativeHandler } ]
@@ -462,32 +462,19 @@ export class KakaoAdapter implements IMapProvider {
   }
 
   addCustomOverlay(options: CustomOverlayOptions): NativeOverlayHandle {
-    const self = this;
-    const CustomOverlayClass = class extends kakao.maps.AbstractOverlay {
-      onAdd(): void {
-        const panel = this.getPanels().overlayLayer;
-        panel.appendChild(options.content);
-      }
-      onRemove(): void {
-        options.content.parentNode?.removeChild(options.content);
-      }
-      draw(): void {
-        const proj = this.getProjection();
-        const pt = proj.containerPointFromCoords(
-          new kakao.maps.LatLng(options.position.lat, options.position.lng),
-        );
-        options.content.style.left = `${pt.getX()}px`;
-        options.content.style.top = `${pt.getY()}px`;
-        options.content.style.position = 'absolute';
-      }
-    };
-    const overlay = new CustomOverlayClass();
-    overlay.setMap(self.map);
+    const overlay = new kakao.maps.CustomOverlay({
+      position: new kakao.maps.LatLng(options.position.lat, options.position.lng),
+      content: options.content,
+      xAnchor: 0,
+      yAnchor: 0,
+      zIndex: options.zIndex ?? 100,
+    });
+    overlay.setMap(this.map);
     return makeHandle(this.overlayReg.register(overlay));
   }
 
   removeCustomOverlay(handle: NativeOverlayHandle): void {
-    (this.overlayReg.get(handle._handleId) as kakao.maps.AbstractOverlay).setMap(null);
+    (this.overlayReg.get(handle._handleId) as kakao.maps.CustomOverlay).setMap(null);
     this.overlayReg.delete(handle._handleId);
   }
 
@@ -553,8 +540,8 @@ export class KakaoAdapter implements IMapProvider {
         const proj = this.getProjection();
         const pos = marker.getPosition();
         const pt = proj.containerPointFromCoords(pos);
-        div.style.left = `${pt.getX()}px`;
-        div.style.top = `${pt.getY() - 20}px`; // above marker
+        div.style.left = `${pt.x}px`;
+        div.style.top = `${pt.y - 20}px`; // above marker
       }
     };
 

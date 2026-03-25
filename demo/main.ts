@@ -1,5 +1,5 @@
 import {
-  KorMap, Marker, InfoWindow, Polyline, Circle,
+  KorMap, Marker, InfoWindow, Polyline, Circle, MarkerClusterer,
   MapTypeId, type MapProvider, type LatLng, type KorMapFeature,
 } from 'kor-mapi';
 
@@ -8,6 +8,22 @@ import {
 // ---------------------------------------------------------------------------
 
 const SEOUL: LatLng = { lat: 37.5665, lng: 126.9780 };      // City Hall
+
+// 40 deterministic positions spiralling outward from Seoul center
+const CLUSTER_POSITIONS: LatLng[] = (() => {
+  const center = SEOUL;
+  const count = 40;
+  const positions: LatLng[] = [];
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 * 4;         // 4 spiral loops
+    const r = 0.02 + 0.06 * ((i % 10) / 10);             // radius 0.02–0.08°
+    positions.push({
+      lat: center.lat + r * Math.cos(angle),
+      lng: center.lng + r * Math.sin(angle) * 1.3,        // stretch for lng aspect ratio
+    });
+  }
+  return positions;
+})();
 const LOTTE_TOWER: LatLng = { lat: 37.5125, lng: 127.1025 };
 const HAN_RIVER_PATH: LatLng[] = [
   { lat: 37.5326, lng: 126.8344 }, // Haengju Bridge
@@ -53,6 +69,7 @@ const maps: Partial<Record<MapProvider, KorMap>> = {};
 const activeMarkers: Marker[] = [];
 const activePolylines: Polyline[] = [];
 const activeCircles: Circle[] = [];
+const activeClusterers: MarkerClusterer[] = [];
 let infoWindow: InfoWindow | null = null;
 let syncing = false; // guard against camera sync feedback loops
 let logCount = 0;
@@ -252,13 +269,43 @@ function addCircle(): void {
   }
 }
 
+function addCluster(): void {
+  for (const c of activeClusterers) {
+    for (const m of c.getMarkers()) m.setMap(null);
+    c.setMap(null);
+  }
+  activeClusterers.length = 0;
+
+  for (const [provider, map] of activeMaps()) {
+    const markers = CLUSTER_POSITIONS.map(pos => {
+      const m = new Marker({ position: pos });
+      m.setMap(map);
+      return m;
+    });
+
+    const clusterer = new MarkerClusterer(map, markers, {
+      gridSize: 60,
+      minClusterSize: 2,
+      maxZoom: 15,
+      averageCenter: true,
+    });
+    activeClusterers.push(clusterer);
+    log(provider, `clustering ${markers.length} markers`);
+  }
+}
+
 function clearAll(): void {
   for (const m of activeMarkers) m.setMap(null);
   for (const p of activePolylines) p.setMap(null);
   for (const c of activeCircles) c.setMap(null);
+  for (const c of activeClusterers) {
+    for (const m of c.getMarkers()) m.setMap(null);
+    c.setMap(null);
+  }
   activeMarkers.length = 0;
   activePolylines.length = 0;
   activeCircles.length = 0;
+  activeClusterers.length = 0;
   if (infoWindow) { infoWindow.close(); infoWindow = null; }
 }
 
@@ -276,6 +323,7 @@ function bindToolbar(): void {
   document.getElementById('btn-marker')!.addEventListener('click', addMarkers);
   document.getElementById('btn-polyline')!.addEventListener('click', addPolyline);
   document.getElementById('btn-circle')!.addEventListener('click', addCircle);
+  document.getElementById('btn-cluster')!.addEventListener('click', addCluster);
   document.getElementById('btn-clear')!.addEventListener('click', clearAll);
 
   document.getElementById('sel-maptype')!.addEventListener('change', (e) => {

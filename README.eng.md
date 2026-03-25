@@ -10,18 +10,19 @@ South Korea restricted Google's map data export for 19 years. That restriction w
 
 ## Current Status: v0.1 — Tier 1 Complete
 
-The following 8 features are implemented and work identically across all three providers:
+The following features are implemented and work identically across all three providers:
 
-| #   | Feature                | API                                                                           |
-| --- | ---------------------- | ----------------------------------------------------------------------------- |
-| 1   | **Initialization**     | `KorMap.create({ provider, container, apiKey, center, zoom })`                |
-| 2   | **Camera / viewport**  | `setCenter`, `getCenter`, `setZoom`, `getZoom`, `fitBounds`, `panTo`, `panBy` |
-| 3   | **Map types**          | `setMapType(MapTypeId.ROADMAP \| SATELLITE \| HYBRID \| TERRAIN)`             |
-| 4   | **Markers**            | `new Marker({ position, icon, title, draggable, opacity, zIndex })`           |
-| 5   | **InfoWindows**        | `new InfoWindow({ content })` → `open(map, anchor?)` / `close()`              |
-| 6   | **Vector overlays**    | `Polyline`, `Polygon`, `Circle`, `Rectangle` with unified stroke/fill styles  |
-| 7   | **Events**             | `map.on('click' \| 'zoom_changed' \| 'center_changed' \| 'idle' \| ...)`      |
-| 8   | **Custom tile layers** | `new TileLayer({ getTileUrl(coord, zoom) })` — works with VWORLD etc.         |
+| #   | Feature                   | API                                                                           |
+| --- | ------------------------- | ----------------------------------------------------------------------------- |
+| 1   | **Initialization**        | `KorMap.create({ provider, container, apiKey, center, zoom })`                |
+| 2   | **Camera / viewport**     | `setCenter`, `getCenter`, `setZoom`, `getZoom`, `fitBounds`, `panTo`, `panBy` |
+| 3   | **Map types**             | `setMapType(MapTypeId.ROADMAP \| SATELLITE \| HYBRID \| TERRAIN)`             |
+| 4   | **Markers**               | `new Marker({ position, icon, title, draggable, opacity, zIndex })`           |
+| 5   | **InfoWindows**           | `new InfoWindow({ content })` → `open(map, anchor?)` / `close()`              |
+| 6   | **Vector overlays**       | `Polyline`, `Polygon`, `Circle`, `Rectangle` with unified stroke/fill styles  |
+| 7   | **Events**                | `map.on('click' \| 'zoom_changed' \| 'center_changed' \| 'idle' \| ...)`      |
+| 8   | **Custom tile layers**    | `new TileLayer({ getTileUrl(coord, zoom) })` — works with VWORLD etc.         |
+| 9   | **Marker clustering**     | `new MarkerClusterer(map, markers, options)` — grid-based, zero dependencies  |
 
 **Provider-specific notes:**
 
@@ -31,9 +32,28 @@ The following 8 features are implemented and work identically across all three p
 - Kakao has no standalone terrain base map — `MapTypeId.TERRAIN` falls back to `ROADMAP`.
 - `map.native` gives direct access to the underlying provider object (`naver.maps.Map`, `kakao.maps.Map`, or `google.maps.Map`).
 
+## Out of Scope: Geocoding, Search, and Routing
+
+Geocoding, address search, POI search, and routing are **intentionally not part of the `kor-mapi` unified API**.
+
+Each provider has fundamentally different service APIs — different data models, result structures, transport mechanisms (client SDK vs. REST-only), and Korean-specific data quality. A common-denominator facade would force lossy type conversions and hide provider capabilities that users actually care about. Naver and Kakao routing is also REST-only and requires a server-side proxy, making it a different integration concern from map rendering.
+
+Use `map.native` to access provider services directly:
+
+```ts
+// Kakao — best for Korean addresses and POI
+const map = await KorMap.create<'kakao'>({ provider: 'kakao', ... });
+const geocoder = new window.kakao.maps.services.Geocoder();
+const places = new window.kakao.maps.services.Places();
+
+// Google — global coverage
+const map = await KorMap.create<'google'>({ provider: 'google', ... });
+const geocoder = new window.google.maps.Geocoder();
+```
+
 ## Not Yet Implemented (Tier 2 / v0.2+)
 
-Geocoding, address search, place/POI search, routing, marker clustering, traffic layer, heatmap, drawing tools, map styles, elevation, street view, tilt/heading, multi-language switching, transit layer, and administrative boundary overlays.
+Traffic layer, heatmap, drawing tools, map styles, elevation, street view, tilt/heading, multi-language switching, transit layer, administrative boundary overlays, and routing.
 
 ## Usage
 

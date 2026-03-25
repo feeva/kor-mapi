@@ -3,6 +3,7 @@ export { KorMap } from './core/KorMap.js';
 export { Marker, InfoWindow, Polyline, Polygon, Circle, Rectangle, CustomOverlay, TileLayer } from './core/overlays.js';
 export { KorMapError, ProviderLoadError, ProviderNotSupportedError, ConfigurationError } from './core/errors.js';
 export { MapTypeId, MarkerAnimation } from './core/types.js';
+export { MarkerClusterer } from './modules/clustering/MarkerClusterer.js';
 export type {
   LatLng, LatLngBounds, Point, Size, Padding,
   MapProvider, KorMapConfig, KorMapApiKey, KorMapFeature,
@@ -14,4 +15,5 @@ export type {
   PolylineOptions, PolygonOptions, CircleOptions, RectangleOptions,
   CustomOverlayOptions, MapProjection, TileLayerOptions, TileCoord,
   FitBoundsOptions, PanOptions,
+  ClusterOptions, ClusterStyle,
 } from './core/types.js';

@@ -11,18 +11,19 @@
 
 ## 현재 상태: v0.1 — Tier 1 구현 완료
 
-아래 8가지 기능이 세 공급자 모두에서 동일하게 동작합니다:
+아래 기능들이 세 공급자 모두에서 동일하게 동작합니다:
 
-| #   | 기능                   | API                                                                           |
-| --- | ---------------------- | ----------------------------------------------------------------------------- |
-| 1   | **초기화**             | `KorMap.create({ provider, container, apiKey, center, zoom })`                |
-| 2   | **카메라 / 뷰포트**    | `setCenter`, `getCenter`, `setZoom`, `getZoom`, `fitBounds`, `panTo`, `panBy` |
-| 3   | **지도 유형**          | `setMapType(MapTypeId.ROADMAP \| SATELLITE \| HYBRID \| TERRAIN)`             |
-| 4   | **마커**               | `new Marker({ position, icon, title, draggable, opacity, zIndex })`           |
-| 5   | **정보창**             | `new InfoWindow({ content })` → `open(map, anchor?)` / `close()`              |
-| 6   | **벡터 오버레이**      | `Polyline`, `Polygon`, `Circle`, `Rectangle` — 통합 선/채우기 스타일          |
-| 7   | **이벤트**             | `map.on('click' \| 'zoom_changed' \| 'center_changed' \| 'idle' \| ...)`      |
-| 8   | **커스텀 타일 레이어** | `new TileLayer({ getTileUrl(coord, zoom) })` — 브이월드 등 지원               |
+| #   | 기능                      | API                                                                           |
+| --- | ------------------------- | ----------------------------------------------------------------------------- |
+| 1   | **초기화**                | `KorMap.create({ provider, container, apiKey, center, zoom })`                |
+| 2   | **카메라 / 뷰포트**       | `setCenter`, `getCenter`, `setZoom`, `getZoom`, `fitBounds`, `panTo`, `panBy` |
+| 3   | **지도 유형**             | `setMapType(MapTypeId.ROADMAP \| SATELLITE \| HYBRID \| TERRAIN)`             |
+| 4   | **마커**                  | `new Marker({ position, icon, title, draggable, opacity, zIndex })`           |
+| 5   | **정보창**                | `new InfoWindow({ content })` → `open(map, anchor?)` / `close()`              |
+| 6   | **벡터 오버레이**         | `Polyline`, `Polygon`, `Circle`, `Rectangle` — 통합 선/채우기 스타일          |
+| 7   | **이벤트**                | `map.on('click' \| 'zoom_changed' \| 'center_changed' \| 'idle' \| ...)`      |
+| 8   | **커스텀 타일 레이어**    | `new TileLayer({ getTileUrl(coord, zoom) })` — 브이월드 등 지원               |
+| 9   | **마커 클러스터링**       | `new MarkerClusterer(map, markers, options)` — 격자 기반, 외부 의존성 없음    |
 
 **공급자별 주요 사항:**
 
@@ -32,9 +33,28 @@
 - 카카오에는 독립적인 지형도 기본 지도가 없어 `MapTypeId.TERRAIN`은 `ROADMAP`으로 대체됩니다.
 - `map.native`로 기반 공급자 객체(`naver.maps.Map`, `kakao.maps.Map`, `google.maps.Map`)에 직접 접근할 수 있습니다.
 
+## 범위 외: 지오코딩, 검색, 경로 탐색
+
+지오코딩, 주소 검색, 장소/POI 검색, 경로 탐색은 **`kor-mapi` 통합 API에서 의도적으로 제외**됩니다.
+
+각 공급자의 서비스 API는 데이터 모델, 결과 구조, 전송 방식(클라이언트 SDK vs REST 전용)이 근본적으로 다릅니다. 공통 분모 파사드를 만들면 각 공급자가 제공하는 고유한 기능(지번/도로명 주소 상세 정보, POI 카테고리 체계 등)을 숨기고 오히려 개발자에게 불필요한 학습 비용을 강요하게 됩니다. 또한 네이버와 카카오의 경로 탐색은 REST 전용이며 서버 측 프록시가 필요하므로 지도 렌더링과는 다른 통합 방식을 요구합니다.
+
+`map.native`를 통해 각 공급자의 서비스에 직접 접근하세요:
+
+```ts
+// 카카오 — 한국 주소 및 POI 검색에 최적
+const map = await KorMap.create<'kakao'>({ provider: 'kakao', ... });
+const geocoder = new window.kakao.maps.services.Geocoder();
+const places = new window.kakao.maps.services.Places();
+
+// 구글 — 글로벌 커버리지
+const map = await KorMap.create<'google'>({ provider: 'google', ... });
+const geocoder = new window.google.maps.Geocoder();
+```
+
 ## 미구현 항목 (Tier 2 / v0.2+)
 
-지오코딩, 주소 검색, 장소/POI 검색, 경로 탐색, 마커 클러스터링, 교통 레이어, 히트맵, 그리기 도구, 지도 스타일, 고도, 거리뷰/로드뷰, 기울기/방향, 다국어 전환, 대중교통 레이어, 행정구역 경계 오버레이.
+교통 레이어, 히트맵, 그리기 도구, 지도 스타일, 고도, 거리뷰/로드뷰, 기울기/방향, 다국어 전환, 대중교통 레이어, 행정구역 경계 오버레이, 경로 탐색.
 
 ## 사용법
 

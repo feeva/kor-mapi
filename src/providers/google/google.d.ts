@@ -237,6 +237,7 @@ declare namespace google {
 
     interface MapPanes {
       overlayLayer: HTMLElement;
+      overlayMouseTarget: HTMLElement;
     }
 
     interface MapCanvasProjection {

@@ -223,7 +223,7 @@ export class GoogleAdapter implements IMapProvider {
       gmpDraggable: options.draggable ?? false,
       zIndex: options.zIndex ?? null,
     });
-    if (options.visible === false && marker.content) marker.content.style.display = 'none';
+    if (options.visible === false) marker.map = null;
     if (options.opacity !== undefined && marker.content) marker.content.style.opacity = String(options.opacity);
     return makeHandle(this.markerReg.register(marker));
   }
@@ -241,7 +241,9 @@ export class GoogleAdapter implements IMapProvider {
     if (options.draggable !== undefined) marker.gmpDraggable = options.draggable;
     if (options.clickable !== undefined) marker.gmpClickable = options.clickable;
     if (options.icon !== undefined) marker.content = buildAdvancedMarkerContent(options as MarkerOptions) ?? null;
-    if (options.visible !== undefined && marker.content) marker.content.style.display = options.visible ? '' : 'none';
+    if (options.visible !== undefined) {
+      marker.map = options.visible ? this.map : null;
+    }
     if (options.opacity !== undefined && marker.content) marker.content.style.opacity = String(options.opacity);
   }
 
@@ -421,7 +423,10 @@ export class GoogleAdapter implements IMapProvider {
     const CustomOverlayClass = class extends google.maps.OverlayView {
       onAdd(): void {
         const panes = this.getPanes();
-        panes?.overlayLayer.appendChild(options.content);
+        if (!panes) return;
+        // overlayLayer has pointer-events:none; use overlayMouseTarget for clickable overlays
+        const pane = options.clickable ? panes.overlayMouseTarget : panes.overlayLayer;
+        pane.appendChild(options.content);
       }
       onRemove(): void {
         options.content.parentNode?.removeChild(options.content);
