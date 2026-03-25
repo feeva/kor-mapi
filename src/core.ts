@@ -13,4 +13,6 @@ export type {
   PolylineOptions, PolygonOptions, CircleOptions, RectangleOptions,
   CustomOverlayOptions, MapProjection, TileLayerOptions, TileCoord,
   FitBoundsOptions, PanOptions,
+  AnyEventHandler,
+  ClusterOptions, ClusterStyle,
 } from './core/types.js';
