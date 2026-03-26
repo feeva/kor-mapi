@@ -1,7 +1,7 @@
 {
-  "name": "@feeva/kor-mapi",
+  "name": "kor-mapi",
   "version": "0.1.0",
-  "description": "Provider-agnostic Korean map facade for Naver Maps, Kakao Maps, and Google Maps",
+  "description": "Provider-agnostic Korean map API facade for Naver Maps, Kakao Maps, and Google Maps",
   "repository": {
     "type": "git",
     "url": "https://github.com/feeva/kor-mapi.git"
